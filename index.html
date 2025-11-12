@@ -2,118 +2,91 @@
 <html lang="tr">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Counter dApp</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.6.0/jquery.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@5.7.2/dist/ethers.umd.min.js"></script>
   <style>
-    body { font-family: system-ui, Arial; max-width: 740px; margin: 40px auto; }
-    h1 { margin-bottom: 0; }
-    .row { margin: 10px 0; }
-    .addr { font-family: monospace; word-break: break-all; color: #555; }
-    button { padding: 10px 16px; margin-right: 8px; cursor: pointer; }
-    #status { margin-top: 12px; color: #0a7; }
+    body { font-family: Arial; text-align: center; margin-top: 50px; background: #fff; }
+    button { margin: 5px; padding: 10px 15px; cursor: pointer; }
+    #log { background-color:#0d1117; color:#00ffcc; padding:10px; border-radius:8px; width:70%; margin:20px auto; text-align:left; }
   </style>
-  <script src="https://cdn.jsdelivr.net/npm/ethers@6/dist/ethers.umd.min.js"></script>
 </head>
 <body>
-  <h1>Counter dApp</h1>
+  <h2>Counter dApp</h2>
 
-  <div class="row">
-    Kontrat adresi:
-    <span id="caddr" class="addr">0x0f40F94D2C8a16fA78004E8928F1cb449B18A4d5</span>
-  </div>
+  <button id="btnConnect">MetaMask'e Bağlan</button>
+  <button id="btnGet">Değeri Oku</button>
+  <button id="btnInc">Artır</button>
+  <button id="btnDec">Azalt</button>
 
-  <div class="row">
-    <button id="btnConnect">Bağlan</button>
-    <button id="btnInc" disabled>increment()</button>
-    <button id="btnDec" disabled>decrement()</button>
-    <button id="btnGet" disabled>get()</button>
-  </div>
+  <p>Kontrat adresi: <span id="caddr"></span></p>
+  <p>Değer: <span id="value">-</span></p>
 
-  <div class="row">Değer: <strong id="value">-</strong></div>
-  <div id="status"></div>
+  <div id="log">Günlük:</div>
 
   <script>
     const CONTRACT_ADDRESS = "0x0f40F94D2C8a16fA78004E8928F1cb449B18A4d5";
-
-    const CONTRACT_ABI = [
-      {
-        "inputs": [],
-        "name": "decrement",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "inputs": [],
-        "name": "increment",
-        "outputs": [],
-        "stateMutability": "nonpayable",
-        "type": "function"
-      },
-      {
-        "inputs": [],
-        "name": "get",
-        "outputs": [
-          {
-            "internalType": "uint256",
-            "name": "",
-            "type": "uint256"
-          }
-        ],
-        "stateMutability": "view",
-        "type": "function"
-      }
+    const ABI = [
+      { "inputs": [], "name": "decrement", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+      { "inputs": [], "name": "increment", "outputs": [], "stateMutability": "nonpayable", "type": "function" },
+      { "inputs": [], "name": "get", "outputs": [{ "internalType": "uint256", "name": "", "type": "uint256" }], "stateMutability": "view", "type": "function" }
     ];
 
-    const $ = (id) => document.getElementById(id);
-    const provider = new ethers.BrowserProvider(window.ethereum);
-    let signer, contract;
+    let provider, signer, contract;
 
     async function connect() {
       try {
+        provider = new ethers.providers.Web3Provider(window.ethereum);
         await provider.send("eth_requestAccounts", []);
-        signer = await provider.getSigner();
-        contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
-        ["btnInc","btnDec","btnGet"].forEach(id => $(id).disabled = false);
-        setStatus("MetaMask bağlandı: " + (await signer.getAddress()));
-      } catch (e) { setStatus("Bağlantı hatası: " + e.message); }
-    }
-
-    async function inc() {
-      try {
-        setStatus("increment() gönderiliyor…");
-        const tx = await contract.increment();
-        await tx.wait();
-        setStatus("increment() tamam.");
-        await getVal();
-      } catch (e) { setStatus("Hata: " + e.message); }
-    }
-
-    async function dec() {
-      try {
-        setStatus("decrement() gönderiliyor…");
-        const tx = await contract.decrement();
-        await tx.wait();
-        setStatus("decrement() tamam.");
-        await getVal();
-      } catch (e) { setStatus("Hata: " + e.message); }
+        signer = provider.getSigner();
+        contract = new ethers.Contract(CONTRACT_ADDRESS, ABI, signer);
+        const account = await signer.getAddress();
+        $("#log").append(`<p>Bağlandı: ${account}</p>`);
+      } catch (err) {
+        $("#log").append(`<p style='color:red'>Bağlantı hatası: ${err.message}</p>`);
+      }
     }
 
     async function getVal() {
       try {
-        const v = await contract.get();
-        $("value").textContent = v.toString();
-      } catch (e) { setStatus("Hata: " + e.message); }
+        const val = await contract.get();
+        $("#value").text(val.toString());
+      } catch (err) {
+        $("#log").append(`<p style='color:red'>Okuma hatası: ${err.message}</p>`);
+      }
     }
 
-    function setStatus(msg){ $("status").textContent = msg; }
+    async function inc() {
+      try {
+        const tx = await contract.increment();
+        await tx.wait();
+        $("#log").append(`<p>Artırma onaylandı ✅</p>`);
+        $("#log").append(`<p><a href='https://sepolia.etherscan.io/tx/${tx.hash}' target='_blank'>${tx.hash}</a></p>`);
+        await getVal();
+      } catch (err) {
+        $("#log").append(`<p style='color:red'>Artırma hatası: ${err.message}</p>`);
+      }
+    }
 
-    $("btnConnect").onclick = connect;
-    $("btnInc").onclick = inc;
-    $("btnDec").onclick = dec;
-    $("btnGet").onclick = getVal;
+    async function dec() {
+      try {
+        const tx = await contract.decrement();
+        await tx.wait();
+        $("#log").append(`<p>Azaltma onaylandı ✅</p>`);
+        $("#log").append(`<p><a href='https://sepolia.etherscan.io/tx/${tx.hash}' target='_blank'>${tx.hash}</a></p>`);
+        await getVal();
+      } catch (err) {
+        $("#log").append(`<p style='color:red'>Azaltma hatası: ${err.message}</p>`);
+      }
+    }
 
-    $("caddr").textContent = CONTRACT_ADDRESS;
+    $("#btnConnect").on("click", connect);
+    $("#btnGet").on("click", getVal);
+    $("#btnInc").on("click", inc);
+    $("#btnDec").on("click", dec);
+
+    $("#caddr").text(CONTRACT_ADDRESS);
   </script>
 </body>
 </html>
