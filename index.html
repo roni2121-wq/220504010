@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Counter dApp</title>
+  <style>
+    body { font-family: system-ui, Arial; max-width: 740px; margin: 40px auto; }
+    h1 { margin-bottom: 0; }
+    .row { margin: 10px 0; }
+    .addr { font-family: monospace; word-break: break-all; color: #555; }
+    button { padding: 10px 16px; margin-right: 8px; cursor: pointer; }
+    #status { margin-top: 12px; color: #0a7; }
+  </style>
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6/dist/ethers.umd.min.js"></script>
+</head>
+<body>
+  <h1>Counter dApp</h1>
+
+  <div class="row">
+    Kontrat adresi:
+    <span id="caddr" class="addr">0x0f40F94D2C8a16fA78004E8928F1cb449B18A4d5</span>
+  </div>
+
+  <div class="row">
+    <button id="btnConnect">Bağlan</button>
+    <button id="btnInc" disabled>increment()</button>
+    <button id="btnDec" disabled>decrement()</button>
+    <button id="btnGet" disabled>get()</button>
+  </div>
+
+  <div class="row">Değer: <strong id="value">-</strong></div>
+  <div id="status"></div>
+
+  <script>
+    const CONTRACT_ADDRESS = "0x0f40F94D2C8a16fA78004E8928F1cb449B18A4d5";
+
+    const CONTRACT_ABI = [
+      {
+        "inputs": [],
+        "name": "decrement",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "increment",
+        "outputs": [],
+        "stateMutability": "nonpayable",
+        "type": "function"
+      },
+      {
+        "inputs": [],
+        "name": "get",
+        "outputs": [
+          {
+            "internalType": "uint256",
+            "name": "",
+            "type": "uint256"
+          }
+        ],
+        "stateMutability": "view",
+        "type": "function"
+      }
+    ];
+
+    const $ = (id) => document.getElementById(id);
+    const provider = new ethers.BrowserProvider(window.ethereum);
+    let signer, contract;
+
+    async function connect() {
+      try {
+        await provider.send("eth_requestAccounts", []);
+        signer = await provider.getSigner();
+        contract = new ethers.Contract(CONTRACT_ADDRESS, CONTRACT_ABI, signer);
+        ["btnInc","btnDec","btnGet"].forEach(id => $(id).disabled = false);
+        setStatus("MetaMask bağlandı: " + (await signer.getAddress()));
+      } catch (e) { setStatus("Bağlantı hatası: " + e.message); }
+    }
+
+    async function inc() {
+      try {
+        setStatus("increment() gönderiliyor…");
+        const tx = await contract.increment();
+        await tx.wait();
+        setStatus("increment() tamam.");
+        await getVal();
+      } catch (e) { setStatus("Hata: " + e.message); }
+    }
+
+    async function dec() {
+      try {
+        setStatus("decrement() gönderiliyor…");
+        const tx = await contract.decrement();
+        await tx.wait();
+        setStatus("decrement() tamam.");
+        await getVal();
+      } catch (e) { setStatus("Hata: " + e.message); }
+    }
+
+    async function getVal() {
+      try {
+        const v = await contract.get();
+        $("value").textContent = v.toString();
+      } catch (e) { setStatus("Hata: " + e.message); }
+    }
+
+    function setStatus(msg){ $("status").textContent = msg; }
+
+    $("btnConnect").onclick = connect;
+    $("btnInc").onclick = inc;
+    $("btnDec").onclick = dec;
+    $("btnGet").onclick = getVal;
+
+    $("caddr").textContent = CONTRACT_ADDRESS;
+  </script>
+</body>
+</html>
